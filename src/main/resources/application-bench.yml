@@ -1,0 +1,17 @@
+# 压测档位：放宽限流，避免测到的是限流器而不是网关自身开销。
+# 用法：java -jar target/ai-gateway-*.jar --spring.profiles.active=bench
+gateway:
+  defaults:
+    app-rpm-limit: 2000000
+    app-model-rpm-limit: 2000000
+    app-tpm-limit: 200000000
+    global-rpm-limit: 5000000
+  logging:
+    # 压测时不写详细日志，避免磁盘 I/O 干扰延迟测量
+    debug-body-sample-rate: 0.0
+
+logging:
+  level:
+    root: WARN
+    com.gateway: WARN
+    com.gateway.infra.ConfigRepository: INFO

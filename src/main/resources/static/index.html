@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 网关控制台</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">⬢</span> AI 网关控制台</div>
+    <div class="conn" id="authArea"></div>
+  </header>
+
+  <div class="layout">
+    <nav id="nav" class="sidebar"></nav>
+    <main id="view" class="content">
+      <div class="empty">输入管理令牌后点击「连接」。</div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <div id="modalRoot"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

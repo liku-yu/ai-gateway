@@ -1,0 +1,99 @@
+server:
+  port: 8080
+  shutdown: graceful
+  netty:
+    connection-timeout: 5s
+    idle-timeout: 60s
+
+spring:
+  application:
+    name: ai-gateway
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:mariadb://127.0.0.1:3306/ai_gateway?useUnicode=true&characterEncoding=utf8&useServerPrepStmts=true
+    username: gw
+    password: ${GW_DB_PASSWORD:gw_dev_pwd}
+    hikari:
+      maximum-pool-size: 8
+      minimum-idle: 2
+      connection-timeout: 3000
+  data:
+    redis:
+      host: ${GW_REDIS_HOST:127.0.0.1}
+      port: ${GW_REDIS_PORT:6379}
+      timeout: 2s
+      lettuce:
+        pool:
+          max-active: 32
+          max-idle: 16
+          min-idle: 4
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+  codec:
+    max-in-memory-size: 16MB
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ai-gateway
+
+gateway:
+  # 虚拟 Key 的哈希盐值；生产环境务必通过环境变量覆盖
+  api-key-salt: ${GW_API_KEY_SALT:dev-only-salt-change-me}
+  # 渠道 API Key 的加密主密钥（AES-256 需要 32 字节 base64）；生产环境用 KMS
+  crypto:
+    master-key: ${GW_CRYPTO_MASTER_KEY:ZGV2LW9ubHktbWFzdGVyLWtleS0zMmJ5dGVzISExMjM=}
+  config:
+    refresh-interval: 30s
+    redis-channel: gw:config:refresh
+  http:
+    connect-timeout: 3s
+    response-timeout: 120s
+    max-connections: 500
+    pending-acquire-timeout: 5s
+  defaults:
+    # 渠道级并发闸门：保护上游的关键手段，代价是每次渠道调用多一次 Redis 往返
+    # （实测 4 核 c=64 下约 20% 吞吐差异）。渠道弹性充足时可置 false 换吞吐。
+    channel-concurrency-enabled: ${GW_CHANNEL_CONCURRENCY:true}
+    # 渠道级 RPM/TPM 闸门：让 gw_channel.rpm_limit / tpm_limit 真正生效。
+    # 与并发闸门共用同一次 Redis 往返，无额外 RTT，故默认开启。
+    channel-quota-enabled: ${GW_CHANNEL_QUOTA:true}
+    request-timeout-ms: 30000
+    max-retries: 2
+    retry-backoff-ms: 200
+    channel-cooldown-seconds: 30
+  masking:
+    enabled: true
+    restore-placeholders: false
+  logging:
+    async-queue-capacity: 20000
+    debug-body-sample-rate: 0.1
+  admin:
+    # 机器令牌（可选）：留空则只允许账号密码登录；非空可用于脚本免登录
+    token: ${GW_ADMIN_TOKEN:}
+    username: ${GW_ADMIN_USER:admin}
+    password: ${GW_ADMIN_PASSWORD:admin123}
+    session-hours: 12
+
+logging:
+  level:
+    root: INFO
+    com.gateway: DEBUG
+    org.springframework.data.redis: INFO
