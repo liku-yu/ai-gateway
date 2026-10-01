@@ -30,6 +30,7 @@
 | 日志与审计 | 有界队列异步落库，访问日志 + 审计事件 + 小时级用量聚合 |
 | 配置热更新 | Redis Pub/Sub 即时广播 + 定时兜底，多实例一致 |
 | 管理 API | Web 控制台的后端；脚本可直接调用（登录后带会话令牌） |
+| **可视化设置** | 控制台「设置」页热调重试/超时/熔断/限流默认值/脱敏等，持久化 + 多实例广播 |
 | 可观测性 | Actuator + Micrometer + Prometheus 指标端点，配套 Grafana 看板 |
 
 ---
@@ -118,6 +119,7 @@ java -jar target/ai-gateway-0.1.0-SNAPSHOT.jar
 | **定价** | 生效中的四种价格；设置 / 移除 |
 | **用量** | 按应用与天数查询请求/错误/输入/输出/缓存读/缓存写/成本，并显示合计 |
 | **对话** | 选模型、填虚拟 Key、发消息（支持流式），直接验证整条链路 |
+| **设置** | 可视化调整运行参数（路由策略/重试/超时/熔断/限流默认值/脱敏/会话时长）；保存即热生效 |
 | **系统** | 自检、刷新配置、管理 API 清单 |
 
 **页面要点**
@@ -319,7 +321,7 @@ GET/POST /admin/api/apps/{id}/balance
 ## 9. 测试与性能
 
 ```bash
-mvn test                                   # 全量（81 个用例）
+mvn test                                   # 全量（82 个用例）
 mvn test -Dtest=GatewayEndToEndTest        # 端到端（真实 Redis/MariaDB + mock 上游）
 mvn test -Dtest=AdminApiTest               # 管理 API 鉴权与只读端点
 mvn test -Dtest=CacheBillingTest           # 缓存计费语义
@@ -359,6 +361,10 @@ python3 scripts/bench.py --url http://127.0.0.1:18081/v1/chat/completions \
 | `gateway.masking.restore-placeholders` | — | false | 响应占位符是否回填 |
 | `gw_price.cache_read_price` | — | 0 | 缓存读单价（元/1K） |
 | `gw_price.cache_write_price` | — | 0 | 缓存写单价（元/1K） |
+
+> `gateway.defaults.*`、`gateway.masking.*`、`gateway.admin.session-hours` 属于**可运行时热调**的项，
+> 可直接在控制台「设置」页修改（持久化到 `gw_setting`，并广播到所有实例）。
+> 其余项（端口 / 数据源 / 加密主密钥 / WebClient 连接池 / 异步队列容量）需改配置并重启。
 
 ---
 
@@ -410,7 +416,7 @@ OpenTelemetry、MCP、用户体系与充值计费闭环。
 ## 相关文件
 
 - 命令手册：[`docs/COMMANDS.md`](docs/COMMANDS.md)
-- 数据库迁移：`src/main/resources/db/migration/`（V1 建表 → V5 清空种子数据）
+- 数据库迁移：`src/main/resources/db/migration/`（V1 建表 → V6 运行时设置）
 - Web 控制台：`src/main/resources/static/`
 - 压测脚本：`scripts/bench.py`
 - Grafana 看板：`deploy/grafana/ai-gateway-dashboard.json`

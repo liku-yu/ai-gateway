@@ -435,6 +435,41 @@ public class AdminApiController {
     }
 
     // ==================================================================
+    // 运行时设置（Web 控制台可视化配置）
+    // ==================================================================
+
+    @GetMapping("/settings")
+    public Mono<List<Map<String, Object>>> settings(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token) {
+        auth.require(token);
+        return async(admin::settings);
+    }
+
+    /** 批量更新：请求体 { "values": { "defaults.max-retries": "3", ... } }。 */
+    @PutMapping("/settings")
+    public Mono<Map<String, Object>> updateSettings(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
+            @RequestBody SettingsReq body) {
+        auth.require(token);
+        return async(() -> {
+            List<String> updated = admin.updateSettings(body == null ? null : body.values());
+            return Map.<String, Object>of("updated", updated);
+        });
+    }
+
+    /** 恢复某项为 application.yml / 环境变量的默认值。 */
+    @DeleteMapping("/settings/{key}")
+    public Mono<Map<String, Object>> resetSetting(
+            @RequestHeader(value = "X-Admin-Token", required = false) String token,
+            @PathVariable String key) {
+        auth.require(token);
+        return async(() -> {
+            admin.resetSetting(key);
+            return Map.of("key", key, "reset", true);
+        });
+    }
+
+    // ==================================================================
 
     private <T> Mono<T> async(Supplier<T> supplier) {
         return Mono.fromCallable(supplier::get).subscribeOn(Schedulers.boundedElastic());
@@ -456,6 +491,9 @@ public class AdminApiController {
     // ==================================================================
 
     public record LoginReq(String username, String password) {
+    }
+
+    public record SettingsReq(Map<String, String> values) {
     }
 
     public record ProviderReq(String code, String name, String baseUrl, String adapter, Boolean disabled) {

@@ -220,7 +220,30 @@ curl -s "$B/admin/api/usage?days=7" -H "$H"
 curl -s "$B/admin/api/usage?days=1&appId=1" -H "$H"
 ```
 
-### 2.9 传统管理端点（保留）
+### 2.9 运行时设置（Web 控制台可视化配置）
+
+| 方法 路径 | 说明 |
+|---|---|
+| `GET /admin/api/settings` | 列出可热调的设置项（含类型/范围/默认值/是否被覆盖） |
+| `PUT /admin/api/settings` | 批量更新 `{values:{"defaults.max-retries":"3",...}}` |
+| `DELETE /admin/api/settings/{key}` | 恢复某项为配置文件/环境变量默认值 |
+
+```bash
+curl -s $B/admin/api/settings -H "$H"
+curl -s -X PUT $B/admin/api/settings -H "$H" -H "$J" \
+  -d '{"values":{"defaults.max-retries":"3","masking.enabled":"true"}}'
+curl -s -X DELETE $B/admin/api/settings/defaults.max-retries -H "$H"
+```
+
+可选键（14 个）：`defaults.routing-strategy`、`defaults.max-retries`、`defaults.request-timeout-ms`、
+`defaults.retry-backoff-ms`、`defaults.channel-cooldown-seconds`、`defaults.channel-concurrency-enabled`、
+`defaults.channel-quota-enabled`、`defaults.app-rpm-limit`、`defaults.app-model-rpm-limit`、
+`defaults.app-tpm-limit`、`defaults.global-rpm-limit`、`masking.enabled`、
+`masking.restore-placeholders`、`admin.session-hours`。
+
+> 修改会持久化到 `gw_setting` 并广播，立即热生效；超出范围/非法值返回 400。
+
+### 2.10 传统管理端点（保留）
 
 `GET /admin/status`、`GET /admin/channels`、`POST /admin/config/refresh`、
 `PUT /admin/channels/{id}/key`、`PUT /admin/channels/{id}/status`、
@@ -301,6 +324,8 @@ mariadb -u gw -pgw_dev_pwd ai_gateway -e \
   "SELECT event_type,actor,target_type,target_id,create_time FROM gw_audit_event ORDER BY id DESC LIMIT 20;"
 mariadb -u gw -pgw_dev_pwd ai_gateway -e \
   "SELECT version,description,success FROM flyway_schema_history ORDER BY installed_rank;"
+mariadb -u gw -pgw_dev_pwd ai_gateway -e \
+  "SELECT setting_key,setting_value,update_time FROM gw_setting;"
 ```
 
 ### 5.3 环境变量
@@ -324,7 +349,7 @@ export GW_CHANNEL_QUOTA=true
 ## 6. 测试与压测
 
 ```bash
-mvn test                                   # 全量（81 个用例）
+mvn test                                   # 全量（82 个用例）
 mvn test -Dtest=GatewayEndToEndTest        # 端到端（真实 Redis/MariaDB + mock 上游）
 mvn test -Dtest=AdminApiTest               # 管理 API 鉴权与只读端点
 mvn test -Dtest=CacheBillingTest           # 缓存计费语义

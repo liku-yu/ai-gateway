@@ -32,9 +32,10 @@ public class AdminSession {
     private static final String HMAC = "HmacSHA256";
 
     private final byte[] key;
-    private final long ttlSeconds;
+    private final GatewayProperties properties;
 
     public AdminSession(GatewayProperties properties) {
+        this.properties = properties;
         String master = properties.getCrypto().getMasterKey();
         if (master == null || master.isBlank()) {
             throw new IllegalStateException("缺少 gateway.crypto.master-key，无法为管理会话签名");
@@ -47,17 +48,17 @@ public class AdminSession {
         } catch (Exception e) {
             throw new IllegalStateException("初始化管理会话密钥失败", e);
         }
-        this.ttlSeconds = Math.max(1, properties.getAdmin().getSessionHours()) * 3600L;
     }
 
+    /** 动态读取会话时长：允许在控制台「设置」里热调（新签发/续期的会话立即生效）。 */
     public long ttlSeconds() {
-        return ttlSeconds;
+        return Math.max(1, properties.getAdmin().getSessionHours()) * 3600L;
     }
 
     public String create(String username) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("u", username);
-        payload.put("exp", Instant.now().getEpochSecond() + ttlSeconds);
+        payload.put("exp", Instant.now().getEpochSecond() + ttlSeconds());
         String body = base64Url(JsonSupport.write(payload).getBytes(StandardCharsets.UTF_8));
         return body + "." + base64Url(hmac(body));
     }

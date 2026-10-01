@@ -16,6 +16,7 @@ public class GatewayBootstrap {
 
     private final ConfigCache configCache;
     private final Environment environment;
+    private final com.gateway.admin.SettingsService settingsService;
 
     @EventListener(ApplicationReadyEvent.class)
     public void warmUp() {
@@ -25,6 +26,8 @@ public class GatewayBootstrap {
                     + "仅限本地开发，切勿用于生产。");
         }
         configCache.loadInitial();
+        // 应用数据库中持久化的运行时设置覆盖（若之前改过重试/超时/熔断等）
+        settingsService.applyAll();
         log.info("AI 网关启动完成，配置版本={}，渠道数={}，虚拟Key数={}",
                 configCache.current().version(),
                 configCache.current().channelCount(),

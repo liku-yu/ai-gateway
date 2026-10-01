@@ -14,25 +14,27 @@ import java.util.stream.Collectors;
 public class RoutingStrategyRegistry {
 
     private final Map<String, RoutingStrategy> strategies;
-    private final String defaultCode;
+    private final com.gateway.infra.GatewayProperties properties;
 
     public RoutingStrategyRegistry(List<RoutingStrategy> discovered,
                                    com.gateway.infra.GatewayProperties properties) {
         this.strategies = discovered.stream()
                 .collect(Collectors.toMap(RoutingStrategy::code, Function.identity(), (a, b) -> a));
-        this.defaultCode = properties.getDefaults().getRoutingStrategy();
-        log.info("已注册路由策略: {}，默认={}", strategies.keySet(), defaultCode);
+        this.properties = properties;
+        log.info("已注册路由策略: {}，默认={}", strategies.keySet(), properties.getDefaults().getRoutingStrategy());
     }
 
     public RoutingStrategy resolve(String code) {
+        String fallbackCode = defaultCode();
         if (code == null || code.isBlank()) {
-            return strategies.getOrDefault(defaultCode, fallback());
+            return strategies.getOrDefault(fallbackCode, fallback());
         }
-        return strategies.getOrDefault(code, strategies.getOrDefault(defaultCode, fallback()));
+        return strategies.getOrDefault(code, strategies.getOrDefault(fallbackCode, fallback()));
     }
 
+    /** 动态读取默认策略：控制台「设置」里改了立刻生效。 */
     public String defaultCode() {
-        return defaultCode;
+        return properties.getDefaults().getRoutingStrategy();
     }
 
     public List<String> available() {

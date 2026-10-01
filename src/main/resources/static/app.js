@@ -106,7 +106,8 @@
   const NAV = [
     ['dashboard', '概览'], ['channels', '渠道'], ['providers', '供应商'],
     ['models', '模型'], ['apps', '应用'], ['keys', '密钥'],
-    ['prices', '定价'], ['usage', '用量'], ['playground', '对话'], ['system', '系统'],
+    ['prices', '定价'], ['usage', '用量'], ['playground', '对话'],
+    ['settings', '设置'], ['system', '系统'],
   ];
 
   function renderNav() {
@@ -348,6 +349,51 @@ DELETE /admin/api/keys/{id}
 GET    /admin/api/prices             POST /admin/api/prices   DELETE /admin/api/prices
 GET    /admin/api/usage?days=7
 POST   /admin/api/config/refresh</pre>`;
+  };
+
+  VIEWS.settings = async () => {
+    const settings = await api('/settings');
+    const groups = {};
+    settings.forEach((s) => { (groups[s.group] = groups[s.group] || []).push(s); });
+
+    let body = '';
+    for (const [group, items] of Object.entries(groups)) {
+      body += `<h3 style="margin-top:18px">${esc(group)}</h3><div class="panel">`;
+      for (const s of items) {
+        const id = 's_' + s.key;
+        let input;
+        if (s.type === 'enum') {
+          input = `<select id="${id}" data-setting="${esc(s.key)}">`
+            + (s.options || []).map((o) => `<option value="${esc(o)}"${String(o) === String(s.value) ? ' selected' : ''}>${esc(o)}</option>`).join('')
+            + `</select>`;
+        } else if (s.type === 'bool') {
+          input = `<select id="${id}" data-setting="${esc(s.key)}">`
+            + `<option value="true"${s.value === true ? ' selected' : ''}>true</option>`
+            + `<option value="false"${s.value === false ? ' selected' : ''}>false</option></select>`;
+        } else {
+          const step = s.type === 'double' ? '0.01' : '1';
+          input = `<input id="${id}" type="number" step="${step}" data-setting="${esc(s.key)}"`
+            + ` value="${esc(s.value)}"${s.min != null ? ` min="${s.min}"` : ''}${s.max != null ? ` max="${s.max}"` : ''}>`;
+        }
+        const badge = s.overridden ? '<span class="tag warn">已覆盖</span>' : '<span class="tag muted">默认</span>';
+        body += `<div class="setting-row">
+            <div class="setting-label">${esc(s.label)} ${badge}
+              <div class="hint">${esc(s.description || '')} <code>${esc(s.key)}</code></div>
+            </div>
+            <div class="setting-input">${input}
+              <button class="btn mini" data-act="settingReset" data-key="${esc(s.key)}">重置</button>
+            </div>
+          </div>`;
+      }
+      body += `</div>`;
+    }
+
+    return `<h2>设置</h2>
+      <div class="sub">运行参数可视化配置：保存后写入数据库、立即热生效，并广播到所有实例。
+      端口 / 数据库 / 加密主密钥等只能改配置文件并重启的项不在此处。</div>
+      <div class="toolbar"><button class="btn primary" data-act="settingsSave">保存全部</button>
+        <span class="hint">“重置”仅清除该项的覆盖，回退到配置文件/环境变量的值。</span></div>
+      ${body}`;
   };
 
   // ---------------- actions ----------------
@@ -622,6 +668,22 @@ POST   /admin/api/config/refresh</pre>`;
   };
 
   App.chatClear = () => { $('#p_out').textContent = '（回复会显示在这里）'; };
+
+  // settings
+  App.settingsSave = async () => {
+    const values = {};
+    document.querySelectorAll('[data-setting]').forEach((el) => { values[el.dataset.setting] = el.value; });
+    try {
+      const r = await api('/settings', { method: 'PUT', body: { values } });
+      toast('已保存 ' + ((r.updated || []).length) + ' 项设置');
+      go('settings');
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  App.settingReset = (d) => confirmBox('重置 ' + d.key + ' 为默认值？', async () => {
+    await api('/settings/' + encodeURIComponent(d.key), { method: 'DELETE' });
+    toast('已重置'); go('settings');
+  });
 
   // ---------------- 登录 ----------------
   function renderAuth() {

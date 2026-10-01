@@ -80,6 +80,7 @@ public class AdminService {
     private final SecretCipher secretCipher;
     private final ApiKeyHasher apiKeyHasher;
     private final JdbcTemplate jdbcTemplate;
+    private final SettingsService settingsService;
 
     private final ProviderMapper providerMapper;
     private final ChannelMapper channelMapper;
@@ -805,6 +806,11 @@ public class AdminService {
     /** 配置变更后的统一收尾：重载本地快照 -> 广播刷新 -> 同步写审计。 */
     public void changed(String eventType, String targetType, String targetId, Map<String, Object> detail) {
         configCache.reload();
+        notify(eventType, targetType, targetId, detail);
+    }
+
+    /** 仅广播刷新 + 写审计，不重载配置快照（供运行时设置等使用）。 */
+    public void notify(String eventType, String targetType, String targetId, Map<String, Object> detail) {
         try {
             redis.convertAndSend(properties.getConfig().getRedisChannel(), "refresh")
                     .block(Duration.ofSeconds(3));
@@ -826,13 +832,30 @@ public class AdminService {
     /** 手动触发配置刷新（等价于广播一次刷新指令）。 */
     public long refreshConfig() {
         configCache.reload();
-        try {
-            redis.convertAndSend(properties.getConfig().getRedisChannel(), "refresh")
-                    .block(Duration.ofSeconds(3));
-        } catch (Exception e) {
-            log.warn("配置广播失败: {}", e.getMessage());
-        }
+        settingsService.applyAll();
+        notify("CONFIG_REFRESH", "config", "all", Map.of());
         return configCache.current().version();
+    }
+
+    // ==================================================================
+    // 运行时设置（Web 控制台可视化配置）
+    // ==================================================================
+
+    public List<Map<String, Object>> settings() {
+        return settingsService.list();
+    }
+
+    public List<String> updateSettings(Map<String, String> values) {
+        List<String> changed = settingsService.update(values);
+        if (!changed.isEmpty()) {
+            notify("SETTINGS_UPDATE", "setting", String.join(",", changed), Map.of("keys", changed));
+        }
+        return changed;
+    }
+
+    public void resetSetting(String key) {
+        settingsService.reset(key);
+        notify("SETTINGS_RESET", "setting", key, Map.of());
     }
 
     private static boolean isSensitive(String key) {

@@ -30,6 +30,7 @@ public class ConfigRefreshListener {
     private final ReactiveRedisConnectionFactory connectionFactory;
     private final ConfigCache configCache;
     private final GatewayProperties properties;
+    private final com.gateway.admin.SettingsService settingsService;
 
     private ReactiveRedisMessageListenerContainer container;
     private Disposable subscription;
@@ -40,8 +41,10 @@ public class ConfigRefreshListener {
         this.subscription = container
                 .receive(ChannelTopic.of(properties.getConfig().getRedisChannel()))
                 .doOnNext(message -> {
-                    log.info("收到配置刷新广播，开始重载本地快照");
+                    log.info("收到配置刷新广播，重载配置快照与运行时设置");
                     configCache.reload();
+                    // 运行时设置（重试/超时/熔断/限流等）也要一起回到最新值，保证多实例一致
+                    settingsService.applyAll();
                 })
                 .doOnError(e -> log.error("配置刷新订阅异常，将依赖定时兜底刷新", e))
                 .subscribe();

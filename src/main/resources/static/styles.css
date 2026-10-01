@@ -128,6 +128,15 @@ td.mono, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-siz
 .toast .item.ok { border-left-color: var(--ok); }
 .toast .item.error { border-left-color: var(--fail); }
 
+/* settings */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 14px; }
+.setting-row { display: grid; grid-template-columns: 1fr 330px; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.setting-row:last-child { border-bottom: none; }
+.setting-label { font-size: 13px; }
+.setting-input { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+.setting-input input, .setting-input select { width: 150px; }
+@media (max-width: 760px) { .setting-row { grid-template-columns: 1fr; } .setting-input { justify-content: flex-start; } }
+
 .empty { color: var(--muted); padding: 40px 0; text-align: center; }
 .hint { color: var(--muted); font-size: 12px; }
 code { background: var(--panel-2); padding: 1px 6px; border-radius: 6px; font-size: 12px; }
