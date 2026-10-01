@@ -139,6 +139,35 @@ java -jar target/ai-gateway-0.1.0-SNAPSHOT.jar
 7. **对话**：切到「对话」页，用刚签发的虚拟 Key 直接测试一次请求。
 8. **定价**：在「定价」里设置输入/输出/缓存读/缓存写四种价格（元/1K）。
 
+### 3.5 用 Docker 一键启动（跨平台，推荐）
+
+不需要本机装 JDK / MySQL / Redis，Windows / macOS / Linux 完全一致。
+
+```bash
+cp .env.docker.example .env      # 然后填入随机值（生成命令见文件内注释）
+docker compose up -d             # 首次会构建镜像 + 拉取 MariaDB/Redis
+# 浏览器打开 http://localhost:8080/  →  用你设置的 GW_ADMIN_USER / GW_ADMIN_PASSWORD 登录
+```
+
+常用命令：
+
+```bash
+docker compose ps                # gateway 显示 healthy 即就绪
+docker compose logs -f gateway
+docker compose down              # 停止（保留数据卷）
+docker compose down -v           # 停止并删除数据
+```
+
+说明：
+
+- **首次构建较慢（依赖下载约 4~5 分钟）**：容器内是空 Maven 仓库，要从零下载依赖树，
+  且这一步默认不打印逐条进度，看起来像“卡住”。构建已配置国内 Maven 镜像 + BuildKit
+  依赖缓存，**再次构建只需几秒**（实测 296s → 2s）。海外环境可
+  `docker compose build --build-arg MAVEN_MIRROR=https://repo1.maven.org/maven2`。
+- 端口默认 8080，可在 `.env` 改 `GATEWAY_PORT`。
+- 数据存在命名卷 `mysql-data` / `redis-data`；密钥全在 `.env`（已被 `.gitignore`）。
+- 与直跑 jar 一样：未注入敏感配置时 compose 直接报错、应用拒绝启动。
+
 ---
 
 ## 4. Web 控制台使用说明

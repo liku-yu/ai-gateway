@@ -1,0 +1,19 @@
+# 构建上下文瘦身 + 防止把本地凭据打进镜像
+target/
+.git/
+.gitignore
+.idea/
+.vscode/
+*.iml
+
+# 凭据与环境文件（运行时由 compose 注入）
+.env
+.env.*
+!.env.example
+!.env.docker.example
+
+# 文档与本地脚本（镜像里不需要）
+docs/
+deploy/
+scripts/
+*.md

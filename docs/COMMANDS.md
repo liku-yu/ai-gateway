@@ -49,6 +49,22 @@ export GW_DB_PASSWORD='<数据库口令>'
 java -jar $JAR
 ```
 
+### 用 Docker 一键启动（跨平台，推荐）
+
+不装 JDK/MySQL/Redis，Windows / macOS / Linux 通用：
+
+```bash
+cp .env.docker.example .env    # 填入随机值（生成命令见文件内注释）
+docker compose up -d           # 首次构建约 4~5 分钟（容器内空 Maven 仓库要下载依赖）
+docker compose ps              # gateway 显示 healthy 即就绪
+docker compose logs -f gateway
+docker compose down            # 停止（保留数据卷）；down -v 连数据一起删
+```
+
+> 端口用 `.env` 的 `GATEWAY_PORT`（默认 8080）；Maven 默认走阿里云镜像，
+> 海外可 `docker compose build --build-arg MAVEN_MIRROR=https://repo1.maven.org/maven2`。
+> 首次构建慢是因为容器内从零下载依赖且默认不打印逐条进度；已加依赖缓存，再构建仅需几秒。
+
 ```bash
 # 打开控制台（浏览器访问 http://localhost:8080/ ）
 xdg-open http://localhost:8080/ 2>/dev/null || echo "浏览器打开 http://localhost:8080/"

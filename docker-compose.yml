@@ -1,0 +1,72 @@
+# ============================================================
+# 一键启动：MySQL(MariaDB) + Redis + 网关
+#
+#   cp .env.docker.example .env      # 填好密码/密钥（生成命令见文件内注释）
+#   docker compose up -d             # 构建并启动
+#   浏览器打开 http://localhost:8080/
+#
+# 敏感配置全部从同目录的 .env 读取；未填写时 compose 会直接报错，
+# 不会用默认值悄悄启动（与项目的启动期安全检查一致）。
+# ============================================================
+
+services:
+  mysql:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: ${MYSQL_DATABASE:-ai_gateway}
+      MARIADB_USER: ${MYSQL_USER:-gw}
+      MARIADB_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 中设置 MYSQL_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 中设置 MYSQL_ROOT_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  gateway:
+    build: .
+    image: ai-gateway:latest
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # —— 中间件地址（容器网络内用服务名）——
+      SPRING_DATASOURCE_URL: "jdbc:mariadb://mysql:3306/${MYSQL_DATABASE:-ai_gateway}?useUnicode=true&characterEncoding=utf8&useServerPrepStmts=true"
+      GW_DB_USER: ${MYSQL_USER:-gw}
+      GW_DB_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 中设置 MYSQL_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      # —— 启动期安全检查要求的敏感项（缺失则拒绝启动）——
+      GW_CRYPTO_MASTER_KEY: ${GW_CRYPTO_MASTER_KEY:?请在 .env 中设置 GW_CRYPTO_MASTER_KEY}
+      GW_API_KEY_SALT: ${GW_API_KEY_SALT:?请在 .env 中设置 GW_API_KEY_SALT}
+      GW_ADMIN_USER: ${GW_ADMIN_USER:-admin}
+      GW_ADMIN_PASSWORD: ${GW_ADMIN_PASSWORD:?请在 .env 中设置 GW_ADMIN_PASSWORD}
+      # —— 可选：机器令牌（脚本免登录）——
+      GW_ADMIN_TOKEN: ${GW_ADMIN_TOKEN:-}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  redis-data:
