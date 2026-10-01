@@ -1,0 +1,27 @@
+# ============================================================
+# 本地开发配置（仅 dev profile）
+#
+# 用法：java -jar target/ai-gateway-*.jar --spring.profiles.active=dev
+#
+# 这里提供了一套「开箱可用」的开发默认凭据，目的是让本地能直接跑起来。
+# 生产环境**绝不要**激活 dev profile：默认 application.yml 下这些项均为空，
+# SecurityConfigValidator 会在缺少敏感配置时拒绝启动。
+# ============================================================
+
+spring:
+  datasource:
+    password: ${GW_DB_PASSWORD:gw_dev_pwd}
+
+gateway:
+  # 虚拟 Key 哈希盐（仅开发用）
+  api-key-salt: ${GW_API_KEY_SALT:dev-only-salt-change-me}
+  crypto:
+    # AES-256 开发主密钥（32 字节 Base64，仅开发用；生产用 KMS/环境变量）
+    master-key: ${GW_CRYPTO_MASTER_KEY:ZGV2LW9ubHktbWFzdGVyLWtleS0zMmJ5dGVzISExMjM=}
+  admin:
+    username: ${GW_ADMIN_USER:admin}
+    password: ${GW_ADMIN_PASSWORD:admin123}
+
+logging:
+  level:
+    com.gateway: DEBUG

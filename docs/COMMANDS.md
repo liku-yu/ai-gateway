@@ -35,8 +35,18 @@ VKEY='sk-gw-你的虚拟Key'   # 在控制台「密钥」页签发后填入
 mvn -DskipTests package
 mvn clean package                                   # 含全部测试
 
-java -jar $JAR                                     # 默认 8080
+# 本地开发（内置开发默认凭据 admin/admin123，开箱可用）
+java -jar $JAR --spring.profiles.active=dev
+
+# 压测（= dev + 放宽限流），指定端口
 java -jar $JAR --spring.profiles.active=bench --server.port=9090
+
+# 生产：**不提供默认凭据**，先注入环境变量，否则启动阶段直接拒绝运行
+export GW_CRYPTO_MASTER_KEY="$(openssl rand -base64 32)"
+export GW_API_KEY_SALT="$(openssl rand -hex 32)"
+export GW_ADMIN_PASSWORD='<强密码，至少 8 位>'
+export GW_DB_PASSWORD='<数据库口令>'
+java -jar $JAR
 ```
 
 ```bash
@@ -294,6 +304,9 @@ mariadb -u gw -pgw_dev_pwd ai_gateway -e \
 ```
 
 ### 5.3 环境变量
+
+> 前三项（`GW_API_KEY_SALT` / `GW_CRYPTO_MASTER_KEY` / `GW_ADMIN_PASSWORD`）在**生产**下必填；
+> 缺失或仍为默认值时网关拒绝启动。本地开发用 `--spring.profiles.active=dev` 可跳过。
 
 ```bash
 export GW_API_KEY_SALT='<长随机串>'

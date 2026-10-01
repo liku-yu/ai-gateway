@@ -51,15 +51,33 @@ GRANT ALL PRIVILEGES ON ai_gateway.* TO 'gw'@'localhost'; FLUSH PRIVILEGES;"
 
 ### 2.2 构建与启动
 
+**本地开发**（内置一套开发默认凭据，开箱可用）：
+
 ```bash
 mvn -DskipTests package
+java -jar target/ai-gateway-0.1.0-SNAPSHOT.jar --spring.profiles.active=dev
+```
+
+**生产**（不提供任何默认凭据）：
+
+```bash
+# 这三项缺失或仍为默认值时，网关会在启动阶段直接拒绝运行
+# （SecurityEnvironmentPostProcessor 在连数据库之前就校验）
+export GW_CRYPTO_MASTER_KEY="$(openssl rand -base64 32)"
+export GW_API_KEY_SALT="$(openssl rand -hex 32)"
+export GW_ADMIN_PASSWORD='<强密码，至少 8 位>'
+export GW_DB_PASSWORD='<数据库口令>'
 java -jar target/ai-gateway-0.1.0-SNAPSHOT.jar
 ```
+
+也可以 `cp .env.example .env` 填好后 `set -a && source .env && set +a` 再启动。
+本地开发想要更接近生产，也可用 `application-local.yml`（已在 `.gitignore`，不会被提交）。
 
 首次启动自动执行 Flyway 迁移（V1 建表 → V5 清空种子数据）。**初始系统是空的**：
 没有供应商、渠道、模型、应用、密钥与定价，全部由你在控制台里自行添加。
 
-控制台登录账号：**`admin` / `admin123`**（通过 `GW_ADMIN_USER` / `GW_ADMIN_PASSWORD` 覆盖，生产必须替换）。
+本地 `dev` 配置的控制台登录账号：**`admin` / `admin123`**。
+生产环境请用环境变量设置账号密码（`GW_ADMIN_USER` / `GW_ADMIN_PASSWORD`）。
 
 ### 2.3 打开 Web 控制台并登录
 
@@ -325,10 +343,10 @@ python3 scripts/bench.py --url http://127.0.0.1:18081/v1/chat/completions \
 
 | 配置 | 环境变量 | 默认 | 说明 |
 |---|---|---|---|
-| `gateway.api-key-salt` | `GW_API_KEY_SALT` | dev 值 | 虚拟 Key 哈希盐，**生产必须替换** |
-| `gateway.crypto.master-key` | `GW_CRYPTO_MASTER_KEY` | dev 值 | AES-256 主密钥（32 字节 Base64），**生产必须替换** |
+| `gateway.api-key-salt` | `GW_API_KEY_SALT` | **无（生产必填）** | 虚拟 Key 哈希盐；dev profile 提供 `dev-only-salt-change-me` |
+| `gateway.crypto.master-key` | `GW_CRYPTO_MASTER_KEY` | **无（生产必填）** | AES-256 主密钥（32 字节 Base64）；dev profile 提供开发值 |
 | `gateway.admin.username` | `GW_ADMIN_USER` | `admin` | 控制台登录用户名 |
-| `gateway.admin.password` | `GW_ADMIN_PASSWORD` | `admin123` | 控制台登录密码，**生产必须替换** |
+| `gateway.admin.password` | `GW_ADMIN_PASSWORD` | **无（生产必填）** | 控制台登录密码（至少 8 位）；dev profile 提供 `admin123` |
 | `gateway.admin.session-hours` | — | 12 | 登录会话有效期（小时） |
 | `gateway.admin.token` | `GW_ADMIN_TOKEN` | 空 | 可选的机器令牌（脚本/CI 免登录）；留空则只允许账号密码登录 |
 | `gateway.config.refresh-interval` | — | 30s | 配置兜底刷新间隔 |
@@ -346,6 +364,8 @@ python3 scripts/bench.py --url http://127.0.0.1:18081/v1/chat/completions \
 
 ## 11. 安全须知
 
+- **启动即校验**：生产配置下（未激活 `dev`），`GW_CRYPTO_MASTER_KEY` / `GW_API_KEY_SALT` /
+  `GW_ADMIN_PASSWORD` 缺失、过弱或仍为默认值时，网关在启动阶段直接拒绝运行，不会静默用默认值。
 - `.env` / `application-local.yml` / `secrets/` 已在 `.gitignore` 中，**切勿提交真实凭据**。
 - 上游密钥以 AES-256-GCM 加密存储；接口只写不读，日志/审计/响应均不含明文。
 - 脱敏映射表只存在于单次请求的内存中，请求结束即回收。

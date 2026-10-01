@@ -1,0 +1,3 @@
+# 启动期安全校验：在 Spring 环境准备阶段（早于数据源/Flyway/Bean）执行
+org.springframework.boot.env.EnvironmentPostProcessor=\
+com.gateway.infra.SecurityEnvironmentPostProcessor

@@ -8,13 +8,18 @@ server:
 spring:
   application:
     name: ai-gateway
+  profiles:
+    group:
+      # 压测属本地场景：激活 bench 时同时激活 dev（提供本地默认凭据）
+      bench: dev
   threads:
     virtual:
       enabled: true
   datasource:
     url: jdbc:mariadb://127.0.0.1:3306/ai_gateway?useUnicode=true&characterEncoding=utf8&useServerPrepStmts=true
-    username: gw
-    password: ${GW_DB_PASSWORD:gw_dev_pwd}
+    username: ${GW_DB_USER:gw}
+    # 无默认值：本地开发用 dev profile 提供，生产必须由环境变量注入
+    password: ${GW_DB_PASSWORD:}
     hikari:
       maximum-pool-size: 8
       minimum-idle: 2
@@ -55,11 +60,11 @@ management:
       application: ai-gateway
 
 gateway:
-  # 虚拟 Key 的哈希盐值；生产环境务必通过环境变量覆盖
-  api-key-salt: ${GW_API_KEY_SALT:dev-only-salt-change-me}
-  # 渠道 API Key 的加密主密钥（AES-256 需要 32 字节 base64）；生产环境用 KMS
+  # 以下敏感项均无默认值：启动时由 SecurityConfigValidator 强制校验；
+  # 本地开发用 --spring.profiles.active=dev 提供默认值，生产必须用环境变量注入。
+  api-key-salt: ${GW_API_KEY_SALT:}
   crypto:
-    master-key: ${GW_CRYPTO_MASTER_KEY:ZGV2LW9ubHktbWFzdGVyLWtleS0zMmJ5dGVzISExMjM=}
+    master-key: ${GW_CRYPTO_MASTER_KEY:}
   config:
     refresh-interval: 30s
     redis-channel: gw:config:refresh
@@ -89,7 +94,7 @@ gateway:
     # 机器令牌（可选）：留空则只允许账号密码登录；非空可用于脚本免登录
     token: ${GW_ADMIN_TOKEN:}
     username: ${GW_ADMIN_USER:admin}
-    password: ${GW_ADMIN_PASSWORD:admin123}
+    password: ${GW_ADMIN_PASSWORD:}
     session-hours: 12
 
 logging:
