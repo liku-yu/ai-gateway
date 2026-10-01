@@ -11,7 +11,42 @@
 
 ---
 
-## 1. 能力总览
+## 1. 适用人群与典型场景
+
+### 1.1 谁适合用
+
+| 人群 | 典型诉求 | 本项目的匹配点 |
+|---|---|---|
+| **个人 / 独立开发者** | 手里多个模型 Key（OpenAI / DeepSeek / 通义 / 自建 Ollama），想统一调用、看清花了多少钱 | 单 jar 起服务 + Web 控制台，零前端构建；预扣→结算→缓存计费，余额按应用设置 |
+| **小团队 / 创业公司** | 没有专职平台团队，但要给多个业务/同事发 Key、控预算、出问题能查 | 多租户应用 + 虚拟 Key（只写不读）+ 日/月预算 + 用量日志与审计 |
+| **企业内部平台 / 架构团队** | 统一模型入口、密钥不外泄、敏感信息不出域、可观测可审计 | 责任链（鉴权/限流/计费/脱敏/路由/熔断）、AES-256-GCM 密钥加密、PII 脱敏、Prometheus/Grafana |
+| **AI 应用 / Agent 开发者** | 用 OpenAI 兼容 SDK，但要随时切换/降级模型、抗上游抖动 | 逻辑模型 + 多渠道路由 + 故障转移/降级/熔断，业务侧零改造 |
+| **用 Claude Code / Cursor 等编码工具的人** | 想让工具用上非官方模型（DeepSeek、自建模型…），或让团队共用额度 | Anthropic Messages 入站 + OpenAI 兼容入站，工具只改 base URL |
+| **运维 / SRE** | 限流、熔断、多实例一致、热更新、可观测 | 多维 Redis Lua 限流、熔断冷却、配置广播、指标与看板 |
+| **不想碰基础设施的人** | 不想维护复杂网关/集群 | MySQL + Redis + 一个 jar；控制台点选配置，无需改 YAML |
+
+### 1.2 能实现什么
+
+- **统一接入、业务零改造**：对外只暴露 OpenAI 兼容接口（外加 Anthropic Messages），内部路由到 9 种上游适配器；换模型/换厂商只改控制台，不改业务代码。
+- **密钥不外泄**：业务只拿到网关签发的虚拟 Key；真实上游 Key 由网关 AES-256-GCM 加密保存、只写不读，泄露面从「直接烧钱」降为「一键吊销」。
+- **成本可核算、可管控**：请求预扣费 → 按上游真实 usage 结算 → 差额退还；按应用/模型统计 token 与成本；支持日/月预算；**Prompt Cache 读写单独计价**，缓存降本看得见。
+- **高可用与自愈**：多渠道负载均衡、换渠道重试（指数退避）、模型降级链、按渠道熔断 + 冷却；上游抖动时业务基本无感。
+- **限流与配额**：Key / 应用 / 单模型 / TPM / 渠道 / 全局 + 并发闸门，全部 Redis Lua 原子完成；单个 Key 泄露也拖不垮整体。
+- **合规与隐私**：6 类 PII 脱敏（手机号/身份证/邮箱/银行卡/IP/密钥，含 Luhn/校验位），占位符映射只存内存；访问日志 + 审计事件 + 小时级聚合。
+- **可观测**：Prometheus 指标（QPS / 延迟 / TTFB / 错误码 / 限流 / 熔断 / 成本 / 脱敏命中）+ 配套 Grafana 看板。
+- **运营可视化**：Web 控制台配置供应商、渠道、模型、应用、密钥、定价，以及 14 项运行时参数（重试/超时/熔断/限流/脱敏等），保存即热生效、多实例广播，无需重启。
+- **让编码工具用上任意模型**：Claude Code 设 `ANTHROPIC_BASE_URL`、其他工具设 `OPENAI_BASE_URL` 指向网关即可。
+
+### 1.3 不适用 / 非目标
+
+- **不是面向公众的 SaaS 售卖平台**：没有用户注册、支付、订阅、兑换码体系（那是 [new-api](https://github.com/QuantumNous/new-api) 的强项）。
+- **不追求上游通道数量极限**：内置 9 种适配器，覆盖主流厂商与「任意 OpenAI 兼容」；没有图像/音频/Rerank/任务插件/插件市场。
+- **不做超大规模集群**：定位单实例到中小规模多实例（MySQL + Redis 共享），不是 Envoy/Kong 那种数据面。
+- **不内置模型本身**：网关只做统一接入与治理，推理仍由上游提供。
+
+---
+
+## 2. 能力总览
 
 | 能力 | 说明 |
 |---|---|
@@ -35,9 +70,9 @@
 
 ---
 
-## 2. 快速开始
+## 3. 快速开始
 
-### 2.1 前置依赖与初始化
+### 3.1 前置依赖与初始化
 
 - JDK 21、Maven 3.9+
 - Redis 7+、MySQL 8 / MariaDB 10.5+
@@ -50,7 +85,7 @@ CREATE USER IF NOT EXISTS 'gw'@'localhost' IDENTIFIED BY 'gw_dev_pwd';
 GRANT ALL PRIVILEGES ON ai_gateway.* TO 'gw'@'localhost'; FLUSH PRIVILEGES;"
 ```
 
-### 2.2 构建与启动
+### 3.2 构建与启动
 
 **本地开发**（内置一套开发默认凭据，开箱可用）：
 
@@ -80,7 +115,7 @@ java -jar target/ai-gateway-0.1.0-SNAPSHOT.jar
 本地 `dev` 配置的控制台登录账号：**`admin` / `admin123`**。
 生产环境请用环境变量设置账号密码（`GW_ADMIN_USER` / `GW_ADMIN_PASSWORD`）。
 
-### 2.3 打开 Web 控制台并登录
+### 3.3 打开 Web 控制台并登录
 
 浏览器访问 **http://localhost:8080/** ，用账号 **`admin`** / 密码 **`admin123`** 登录
 （用户名密码也可用 `GW_ADMIN_USER` / `GW_ADMIN_PASSWORD` 覆盖）。
@@ -89,7 +124,7 @@ java -jar target/ai-gateway-0.1.0-SNAPSHOT.jar
 > 登录成功后会签发一个 HMAC 签名会话令牌（有效期默认 12h），存放在浏览器本地；
 > 退出即丢弃。脚本/CI 如需免登录，可配置 `gateway.admin.token` 机器令牌。
 
-### 2.4 首次配置（全部在网页完成）
+### 3.4 首次配置（全部在网页完成）
 
 系统初始为空，按下面顺序添加：
 
@@ -106,7 +141,7 @@ java -jar target/ai-gateway-0.1.0-SNAPSHOT.jar
 
 ---
 
-## 3. Web 控制台使用说明
+## 4. Web 控制台使用说明
 
 | 模块 | 能做什么 |
 |---|---|
@@ -131,9 +166,9 @@ java -jar target/ai-gateway-0.1.0-SNAPSHOT.jar
 
 ---
 
-## 4. 技术栈与架构
+## 5. 技术栈与架构
 
-### 4.1 技术栈
+### 5.1 技术栈
 
 | 层面 | 选型 |
 |---|---|
@@ -147,7 +182,7 @@ java -jar target/ai-gateway-0.1.0-SNAPSHOT.jar
 | 分词 | jtokkit（cl100k_base 懒加载 + 短缓存） |
 | 可观测 | Actuator + Micrometer + Prometheus + Grafana |
 
-### 4.2 请求生命周期（责任链）
+### 5.2 请求生命周期（责任链）
 
 ```
 ① 请求解析(5) → ② 鉴权(10) → ③ 模型权限(15) → ④ 成本预估(20) → ⑤ 准入控制(30)
@@ -157,7 +192,7 @@ java -jar target/ai-gateway-0.1.0-SNAPSHOT.jar
 OpenAI 与 Anthropic 两个入站入口最终都构造同一种内部 `ChatRequest`，走这条责任链。
 `FilterChainFactory` 在链尾以 `finalizeOnce` 兜底终结，任何环节失败或客户端断连都不会泄漏预扣费与并发额度。
 
-### 4.3 模块结构
+### 5.3 模块结构
 
 ```
 src/main/java/com/gateway/
@@ -179,7 +214,7 @@ src/main/resources/static/   Web 控制台（index.html / app.js / styles.css）
 **统一管理出口**：所有配置变更都收敛到 `com.gateway.admin.AdminService`
 （重载快照 → Redis 广播 → 写审计）。Web 控制台与管理 API 都是它的薄封装。
 
-### 4.4 关键工程决策
+### 5.4 关键工程决策
 
 - **热路径零 DB 查询**：渠道/Key/定价走本地快照，变更时 Redis 广播刷新。
 - **责任链只做校验与准备，不选渠道**：渠道选择收敛到调用器，才能与重试预算、冷却、熔断协同。
@@ -190,7 +225,7 @@ src/main/resources/static/   Web 控制台（index.html / app.js / styles.css）
 
 ---
 
-## 5. 接入上游（Provider 适配器）
+## 6. 接入上游（Provider 适配器）
 
 供应商（`gw_provider`）= 协议 + baseUrl；渠道（`gw_channel`）= 供应商 + 密钥 + 模型映射。
 适配器按 `gw_provider.adapter_class` 解析，缺省回退到 `code`，大小写不敏感并支持别名。
@@ -213,7 +248,7 @@ src/main/resources/static/   Web 控制台（index.html / app.js / styles.css）
 
 ---
 
-## 6. 多协议入站（Anthropic Messages）
+## 7. 多协议入站（Anthropic Messages）
 
 | 入站路径 | 协议 |
 |---|---|
@@ -232,9 +267,9 @@ export ANTHROPIC_AUTH_TOKEN=sk-gw-你在控制台签发的虚拟Key   # 也支�
 
 ---
 
-## 7. Prompt Cache 计费
+## 8. Prompt Cache 计费
 
-### 7.1 归一字段
+### 8.1 归一字段
 
 | 上游 | 原始字段 | 归一后 |
 |---|---|---|
@@ -243,7 +278,7 @@ export ANTHROPIC_AUTH_TOKEN=sk-gw-你在控制台签发的虚拟Key   # 也支�
 | Gemini | `cachedContentTokenCount` | `cached_tokens` |
 | Responses | `input_tokens_details.cached_tokens` | `cached_tokens` |
 
-### 7.2 计费口径
+### 8.2 计费口径
 
 `prompt_tokens` 恒为**输入总量**（Anthropic 的 `input+read+creation`）：
 
@@ -255,7 +290,7 @@ export ANTHROPIC_AUTH_TOKEN=sk-gw-你在控制台签发的虚拟Key   # 也支�
 预扣不假设缓存命中（按标准输入价保守预扣），结算按真实 usage 多退少补。
 指标新增 `gateway.tokens.cached`、`gateway.tokens.cache.write`。
 
-### 7.3 配置（网页「定价」页或 API）
+### 8.3 配置（网页「定价」页或 API）
 
 ```bash
 # 先登录拿会话令牌（默认账号 admin / admin123）
@@ -273,9 +308,9 @@ curl -s -X POST http://127.0.0.1:8080/admin/api/prices -H "X-Admin-Token: $TOKEN
 
 ---
 
-## 8. 管理与可观测
+## 9. 管理与可观测
 
-### 8.1 管理 API（Web 控制台与脚本共用）
+### 9.1 管理 API（Web 控制台与脚本共用）
 
 完整清单与示例见 [`docs/COMMANDS.md`](docs/COMMANDS.md)。
 
@@ -296,7 +331,7 @@ GET/POST /admin/api/apps/{id}/balance
 
 传统的 `/admin/status`、`/admin/channels`、`/admin/config/refresh` 等端点保留，行为一致。
 
-### 8.2 Prometheus 指标与 Grafana
+### 9.2 Prometheus 指标与 Grafana
 
 `/actuator/prometheus` 暴露指标，`deploy/grafana/ai-gateway-dashboard.json` 是总览看板。
 
@@ -318,7 +353,7 @@ GET/POST /admin/api/apps/{id}/balance
 
 ---
 
-## 9. 测试与性能
+## 10. 测试与性能
 
 ```bash
 mvn test                                   # 全量（82 个用例）
@@ -341,7 +376,7 @@ python3 scripts/bench.py --url http://127.0.0.1:18081/v1/chat/completions \
 
 ---
 
-## 10. 配置项
+## 11. 配置项
 
 | 配置 | 环境变量 | 默认 | 说明 |
 |---|---|---|---|
@@ -368,7 +403,7 @@ python3 scripts/bench.py --url http://127.0.0.1:18081/v1/chat/completions \
 
 ---
 
-## 11. 安全须知
+## 12. 安全须知
 
 - **启动即校验**：生产配置下（未激活 `dev`），`GW_CRYPTO_MASTER_KEY` / `GW_API_KEY_SALT` /
   `GW_ADMIN_PASSWORD` 缺失、过弱或仍为默认值时，网关在启动阶段直接拒绝运行，不会静默用默认值。
@@ -383,7 +418,7 @@ python3 scripts/bench.py --url http://127.0.0.1:18081/v1/chat/completions \
 
 ---
 
-## 12. 与其他 AI 网关的对照
+## 13. 与其他 AI 网关的对照
 
 调研了 litellm、Portkey、Bifrost、AxonHub、new-api/one-api、gpt-load、tensorzero、plano、magpie。
 本项目已吸收：**Web 管理后台（模块化导航 + 资源化 API + 渠道测试/复制/批量测试，参考 new-api）**、
@@ -393,7 +428,7 @@ OpenTelemetry、MCP、用户体系与充值计费闭环。
 
 ---
 
-## 13. 已知限制与后续路线
+## 14. 已知限制与后续路线
 
 **限制**
 
