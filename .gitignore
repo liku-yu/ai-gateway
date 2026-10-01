@@ -6,6 +6,7 @@ target/
 # 凭据与本地配置：绝不入库
 .env
 .env.*
+!.env.example
 *.local.yml
 application-local.yml
 secrets/
