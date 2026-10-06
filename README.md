@@ -18,17 +18,11 @@
 
 | 概览 · 运行状态与自检 | 渠道 · 密钥 / 映射 / 熔断 / 配额 |
 |---|---|
-| ![概览](docs/images/01-dashboard.png) | ![渠道](docs/images/02-channels.png) |
-| **供应商 · 适配器与 baseUrl** | **模型 · 逻辑模型与降级链** |
-| ![供应商](docs/images/03-providers.png) | ![模型](docs/images/04-models.png) |
-| **应用 · 租户 / 预算 / 可用模型** | **密钥 · 虚拟 Key 签发与吊销** |
-| ![应用](docs/images/05-apps.png) | ![密钥](docs/images/06-keys.png) |
-| **定价 · 输入/输出/缓存读写单价** | **用量 · 请求 / token / 成本核算** |
-| ![定价](docs/images/07-prices.png) | ![用量](docs/images/08-usage.png) |
-| **对话 · 走完整责任链并回显网关元信息** | **设置 · 运行参数热更新** |
-| ![对话](docs/images/11-playground.png) | ![设置](docs/images/09-settings.png) |
-| **系统 · 自检与管理 API 清单** | |
-| ![系统](docs/images/10-system.png) | |
+| ![概览](docs/images/console-dashboard.png) | ![渠道](docs/images/console-channels.png) |
+| **用量 · 请求 / token / 成本核算** | **对话 · 走完整责任链并回显网关元信息** |
+| ![用量](docs/images/console-usage.png) | ![对话](docs/images/console-playground.png) |
+| **设置 · 运行参数热更新** | |
+| ![设置](docs/images/console-settings.png) | |
 
 ---
 

@@ -5,7 +5,7 @@
 
 > Web 控制台启动后访问 `http://localhost:8080/`，下面所有管理操作都可在界面上点选完成。
 
-![系统页 · 自检与管理 API 清单](images/10-system.png)
+![系统页 · 自检与管理 API 清单](images/console-system.png)
 
 ---
 
