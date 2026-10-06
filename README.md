@@ -11,21 +11,6 @@
 
 ---
 
-## 界面预览
-
-> 以下截图来自本地启动后的真实控制台（含一组示例数据，非设计稿），覆盖配置、路由、计费、
-> 对话验证与运行时设置等核心模块。
-
-| 概览 · 运行状态与自检 | 渠道 · 密钥 / 映射 / 熔断 / 配额 |
-|---|---|
-| ![概览](docs/images/console-dashboard.png) | ![渠道](docs/images/console-channels.png) |
-| **用量 · 请求 / token / 成本核算** | **对话 · 走完整责任链并回显网关元信息** |
-| ![用量](docs/images/console-usage.png) | ![对话](docs/images/console-playground.png) |
-| **设置 · 运行参数热更新** | |
-| ![设置](docs/images/console-settings.png) | |
-
----
-
 ## 1. 适用人群与典型场景
 
 ### 1.1 谁适合用
@@ -139,6 +124,10 @@ java -jar target/ai-gateway-0.1.0-SNAPSHOT.jar
 > 登录成功后会签发一个 HMAC 签名会话令牌（有效期默认 12h），存放在浏览器本地；
 > 退出即丢弃。脚本/CI 如需免登录，可配置 `gateway.admin.token` 机器令牌。
 
+登录后默认进入「概览」页，可查看配置版本、资源数量、熔断情况与一键自检：
+
+![控制台概览](docs/images/console-dashboard.png)
+
 ### 3.4 首次配置（全部在网页完成）
 
 系统初始为空，按下面顺序添加：
@@ -153,6 +142,10 @@ java -jar target/ai-gateway-0.1.0-SNAPSHOT.jar
    然后 `密钥 → 签发密钥`（明文仅显示一次）。
 7. **对话**：切到「对话」页，用刚签发的虚拟 Key 直接测试一次请求。
 8. **定价**：在「定价」里设置输入/输出/缓存读/缓存写四种价格（元/1K）。
+
+配置完成后，「渠道」页会汇总每条渠道的模型映射、密钥状态、限流与熔断：
+
+![渠道管理](docs/images/console-channels.png)
 
 ### 3.5 用 Docker 一键启动（跨平台，推荐）
 
@@ -200,6 +193,10 @@ docker compose down -v           # 停止并删除数据
 | **对话** | 选模型、填虚拟 Key、发消息（支持流式），直接验证整条链路 |
 | **设置** | 可视化调整运行参数（路由策略/重试/超时/熔断/限流默认值/脱敏/会话时长）；保存即热生效 |
 | **系统** | 自检、刷新配置、管理 API 清单 |
+
+「对话」页可直接发起一次推理，走完整责任链并在响应末尾回显路由与耗时元信息：
+
+![对话实验场](docs/images/console-playground.png)
 
 **页面要点**
 
@@ -350,6 +347,10 @@ curl -s -X POST http://127.0.0.1:8080/admin/api/prices -H "X-Admin-Token: $TOKEN
 
 > V3 迁移会给存量定价填保守占位（读 0.1×、写 1.25× 输入价），真实价格请覆盖。
 
+控制台「用量」页按应用与天数聚合，缓存读/写 token 与成本单列，方便核对缓存降本效果：
+
+![用量与成本](docs/images/console-usage.png)
+
 ---
 
 ## 9. 管理与可观测
@@ -444,6 +445,10 @@ python3 scripts/bench.py --url http://127.0.0.1:18081/v1/chat/completions \
 > `gateway.defaults.*`、`gateway.masking.*`、`gateway.admin.session-hours` 属于**可运行时热调**的项，
 > 可直接在控制台「设置」页修改（持久化到 `gw_setting`，并广播到所有实例）。
 > 其余项（端口 / 数据源 / 加密主密钥 / WebClient 连接池 / 异步队列容量）需改配置并重启。
+
+控制台「设置」页把上述可热调项可视化，保存后写入 `gw_setting` 并广播到所有实例：
+
+![运行参数设置](docs/images/console-settings.png)
 
 ---
 
